@@ -9,37 +9,48 @@ contract TestNft is ERC721URIStorage, Ownable {
 
     uint256 public constant MAX_SUPPLY = 100;
     uint256 public constant MINT_PRICE = 0.01 ether;
+    string public baseUrl;
 
     event NFTMinted(address indexed owner, uint256 tokenId, string tokenURI);
 
     constructor(
-        address initialOwner
-    ) ERC721("TestNft", "TNFT") Ownable(initialOwner) {}
+        address _initialOwner,
+        string memory _metadataBaseURI
+    ) ERC721("TestNft", "TNFT") Ownable(_initialOwner) {
+        baseUrl = string(abi.encodePacked("ipfs://", _metadataBaseURI, "/"));
+    }
 
-    function mintNFT(
-        address recipient,
-        string memory tokenURI
-    ) public payable returns (uint256) {
+    function mintNFT(address recipient) public payable returns (uint256) {
         require(_tokenIds < MAX_SUPPLY, "Maximum supply reached");
         require(msg.value >= MINT_PRICE, "Insufficient funds");
+
+        uint256 newTokenId = _tokenIds;
+        _safeMint(recipient, newTokenId);
+        _setTokenURI(
+            newTokenId,
+            string(
+                abi.encodePacked(baseUrl, Strings.toString(newTokenId), ".json")
+            )
+        );
 
         unchecked {
             _tokenIds++;
         }
 
-        _safeMint(recipient, _tokenIds);
-        _setTokenURI(_tokenIds, tokenURI);
-
-        emit NFTMinted(recipient, _tokenIds, tokenURI);
+        emit NFTMinted(recipient, newTokenId, tokenURI(newTokenId));
 
         if (msg.value > MINT_PRICE) {
             payable(msg.sender).transfer(msg.value - MINT_PRICE);
         }
 
-        return _tokenIds;
+        return newTokenId;
     }
 
     function totalSupply() public view returns (uint256) {
         return _tokenIds;
+    }
+
+    function withdraw() public onlyOwner {
+        payable(owner()).transfer(address(this).balance);
     }
 }
